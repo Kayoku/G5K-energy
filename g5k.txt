@@ -1,0 +1,42 @@
+G5K
+
+https://www.grid5000.fr/w/Getting_Started
+https://www.grid5000.fr/w/VPN
+https://www.grid5000.fr/w/Energy_consumption_monitoring_tutorial#On_other_sites
+https://www.thomas-krenn.com/en/wiki/Configuring_IPMI_under_Linux_using_ipmitool
+
+Connexion to lille
+ssh jbouchoucha@access.grid5000.fr
+ssh lille
+
+Get json of a machine
+https://api.grid5000.fr/stable/sites/lille/clusters/chetemi/nodes/chetemi-10.json
+
+See all list
+https://intranet.grid5000.fr/oar/Lille/drawgantt-svg/
+
+With VPN
+ssh jbouchoucha@frontend.lille.grid5000.fr
+
+IPMI:
+sudo-g5k ipmitool lan print (print global information)
+
+==========
+SNMP
+==========
+
+G5K links
+==========
+https://www.grid5000.fr/w/Power_Monitoring_Devices
+https://www.grid5000.fr/w/Energy_consumption_monitoring_tutorial#By_querying_Power_Distribution_Units_devices
+
+SNMP tuto
+=========
+https://blog.paessler.com/snmp-monitoring-via-oids-mibs
+https://makina-corpus.com/blog/metier/2016/initiation-a-snmp-avec-python-pysnmp
+
+SNMP example
+=========
+https://api.grid5000.fr/stable/sites/lille/clusters/chetemi/nodes/chetemi-13.json
+https://api.grid5000.fr/stable/sites/lille/pdus/pdu-b3p2-2.json
+snmpget -v2c -c public pdu-b3p2-2.lille.grid5000.fr iso.3.6.1.4.1.318.1.1.26.9.4.3.1.7.6
