@@ -9,9 +9,6 @@ do
 	req1=`eval $cmd1`
 	req2=`eval $cmd2`
 	res=$(($req1 + $req2))
-	if [ $val -ne $res ]
-	then
-		echo $res
-		val=$res
-	fi
+	echo $res
+	val=$res
 done

@@ -35,8 +35,49 @@ SNMP tuto
 https://blog.paessler.com/snmp-monitoring-via-oids-mibs
 https://makina-corpus.com/blog/metier/2016/initiation-a-snmp-avec-python-pysnmp
 
-SNMP example
+SNMP example with chetemi-13
 =========
 https://api.grid5000.fr/stable/sites/lille/clusters/chetemi/nodes/chetemi-13.json
 https://api.grid5000.fr/stable/sites/lille/pdus/pdu-b3p2-2.json
 snmpget -v2c -c public pdu-b3p2-2.lille.grid5000.fr iso.3.6.1.4.1.318.1.1.26.9.4.3.1.7.6
+
+SNMP example with chiclet-8
+=========
+
+https://api.grid5000.fr/stable/sites/lille/clusters/chiclet/nodes/chiclet-8.json
+pdu	
+0	
+port	11
+uid	"pdu-b1p1"
+1	
+port	12
+uid	"pdu-b1p3"
+https://api.grid5000.fr/stable/sites/lille/pdus/pdu-b1p1.json
+outlet_prefix_oid	"iso.3.6.1.4.1.318.1.1.26.9.4.3.1.7"
+https://api.grid5000.fr/stable/sites/lille/pdus/pdu-b1p3.json
+outlet_prefix_oid	"iso.3.6.1.4.1.318.1.1.26.9.4.3.1.7"
+
+
+
+
+=========
+GET VALUES
+=========
+
+with kwapi:
+with an interval (1v/s):
+https://api.grid5000.fr/stable/sites/lyon/metrics/power/timeseries?resolution=1&only=nova-1,nova-2&from=1521624864&to=1521625164
+in live (1v/s):
+http://kwapi.lyon:5000/probes/ | http://kwapi.lyon:5000/probes/lyon.nova-23/power/
+
+with SNMP (~1v/s):
+snmpget -v2c -c public pdu-b3p1.lille.grid5000.fr iso.3.6.1.4.1.318.2.1.6.1.0 iso.3.6.1.4.1.318.2.1.6.2.0 iso.3.6.1.4.1.318.1.1.26.9.4.3.1.7.10
+snmpbulkget -Cr1 -v2c -c public pdu-b3p1.lille.grid5000.fr iso.3.6.1.4.1.318.2.1.6 iso.3.6.1.4.1.318.2.1.6.1.0 iso.3.6.1.4.1.318.1.1.26.9.4.3.1.7.9
+
+with OmegaWatt:
+in live (1v/s):
+http://wattmetre.lyon.grid5000.fr/GetWatts-json.php
+with raw data live (50v/s):
+http://wattmetre.lyon.grid5000.fr/data/wattmetre3-log/power.csv.<YYYY-MM-DD>T<HH>
+with raw data < 1h (50v/s):
+http://wattmetre.lyon.grid5000.fr/data/wattmetre3-log/power.csv.<YYYY-MM-DD>T<HH>.gz
