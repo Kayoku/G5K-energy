@@ -25,6 +25,9 @@ import logging
 import sys
 import datetime
 import asyncio
+import pymongo
+import socket
+from execo_g5k import get_host_attributes
 from pysnmp.hlapi.asyncio import getCmd, SnmpEngine, CommunityData, UdpTransportTarget, ContextData, ObjectIdentity, ObjectType
 
 LOGGER = logging.getLogger()
@@ -35,40 +38,14 @@ LOGGER.addHandler(logging.StreamHandler())
 ##############################################################################
 
 
-def get_node_url(city_name, cluster_name, node_name):
-    """
-    Return the url to JSON information available on g5k about this node
-    :param city_name: City name
-    :param cluster_name: Cluster name
-    :param node_name: Node name
-    :return: URL of the node
-    """
-    return "https://api.grid5000.fr/stable/sites/"+city_name+"/clusters/"+cluster_name+"/nodes/"+node_name+".json"
-
-
-def get_pdu_url(city_name, pdu_name):
-    """
-    Return the url to JSON information available on g5k about this pdu
-    :param city_name: City name
-    :param pdu_name: PDU name
-    :return: URL of the node
-    """
-    return "https://api.grid5000.fr/stable/sites/"+city_name+"/pdus/"+pdu_name+".json"
-
-
 def is_snmp_available(args):
     """
     Allow to know if SNMP-sensor is available for this node
     :param args: Script argument
     :return: True if available, False otherwise
     """
-    url = get_node_url(args.city_name, args.cluster_name, args.node_name)
     try:
-        request = requests.get(url,
-                               auth=(args.g5k_login,
-                                     args.g5k_pass),
-                               verify=False)
-        data = request.json()
+        data = get_host_attributes(args.node_name)
         data['sensors']['power']['via']['pdu']
     except KeyError:
         return False
@@ -81,12 +58,7 @@ def get_pdu_ip_and_port(args):
     :param args: Script argument
     :return: List of PDU with IP/port
     """
-    url = get_node_url(args.city_name, args.cluster_name, args.node_name)
-    request = requests.get(url,
-                           auth=(args.g5k_login,
-                                 args.g5k_pass),
-                           verify=False)
-    data = request.json()
+    data = get_host_attributes(args.node_name)
 
     # Get PDU name
     pdus_name = [pdu['uid'] for pdu in data['sensors']['power']['via']['pdu']]
@@ -94,19 +66,13 @@ def get_pdu_ip_and_port(args):
     # Get PDU IP/port
     pdus_infos = []
     for pdu_name in pdus_name:
-        pdu_url = get_pdu_url(args.city_name, pdu_name)
-        pdu_request = requests.get(pdu_url,
-                                   auth=(args.g5k_login,
-                                         args.g5k_pass),
-                                   verify=False)
-        pdu_data = pdu_request.json()
-
         port = None
-        for key_port, value_node_name in pdu_data['ports'].items():
-            if value_node_name == args.node_name:
-                port = key_port
+        for pdu_info in data['sensors']['power']['via']['pdu']:
+            if pdu_info['uid'] == pdu_name:
+                port = pdu_info['port']
                 break
-        pdus_infos.append((pdu_name, pdu_data['ip'], port))
+        ip = socket.gethostbyname(pdu_name+".lille.grid5000.fr")
+        pdus_infos.append((pdu_name, ip, port))
 
     return pdus_infos
 
@@ -144,6 +110,40 @@ def run_watt(pdu_ip, pdu_node_port):
     return watt, timestamp
 
 
+def connect_mongodb(args):
+    """
+    Return the collection to write the output
+    :param args: Script arguments
+    :return: MongoDB collection
+    """
+    mongo_client = pymongo.MongoClient(args.mongodb_uri,
+                                       serverSelectionTimeoutMS=5)
+    collection = mongo_client[args.mongodb_db][args.mongodb_collection]
+
+    # Check if it work
+    try:
+        mongo_client.admin.command('ismaster')
+    except pymongo.errors.ServerSelectionTimeoutError:
+        LOGGER.error("MongoDB error.")
+        exit(-1)
+
+    return collection
+
+
+def create_data(timestamp, sensor, power):
+    """
+    Create the Dict with data
+    :param timestamp: Timestamp int
+    :param sensor: Sensor name
+    :param power: Power value
+    :return: Dict data
+    """
+    return {
+        "timestamp": timestamp,
+        "sensor": sensor,
+        "power": power
+    }
+
 ##############################################################################
 # Parser
 ##############################################################################
@@ -161,9 +161,9 @@ def arg_parser_init():
     parser.add_argument("g5k_pass", help="G5K password")
 
     # MongoDB output
-    #parser.add_argument("output_uri", help="MongoDB output uri")
-    #parser.add_argument("output_db", help="MongoDB output database")
-    #parser.add_argument("output_collection", help="MongoDB output collection")
+    parser.add_argument("mongodb_uri", help="MongoDB output uri")
+    parser.add_argument("mongodb_db", help="MongoDB output database")
+    parser.add_argument("mongodb_collection", help="MongoDB output collection")
 
     # Node informations
     parser.add_argument("city_name", help="City name where the cluster is")
@@ -184,21 +184,23 @@ def main():
     args = arg_parser_init().parse_args()
 
     LOGGER.warning("/!\ Make sure you are in the G5K network /!\\")
-    LOGGER.warning("This script is written for working with python 3.5.")
+    LOGGER.warning("/!\ This script is not compatible with python 3.7 /!\\")
 
     # Test is SNMP-sensor can monitor this node
     if not is_snmp_available(args):
         LOGGER.error("SNMP-sensor not available for the node " + args.node_name)
         sys.exit(-1)
 
+    # Get the MongoDB
+    output = connect_mongodb(args)
+
     # Get the tuple IP/port of each necessary PDU
     pdus_infos = get_pdu_ip_and_port(args)
 
     # Run loop
     loop = asyncio.get_event_loop()
-    history = {}
+    next_ts = 0
     while True:
-
         tasks = []
 
         for pdu_info in pdus_infos:
@@ -210,11 +212,17 @@ def main():
         value = 0
         for t in tasks:
             res = t.result()
+            if res[0] is None and res[1] is None:
+                LOGGER.warning("Loose connection with SNMP node.")
+                exit(-1)
             ts = res[1]
             value += res[0]
-        history[ts] = value
-        LOGGER.warning("Break")
-        LOGGER.warning(history)
+
+        new_data = create_data(ts, "snmp-sensor", value)
+        if next_ts < new_data["timestamp"]:
+            LOGGER.info(new_data)
+            output.insert_one(new_data)
+            next_ts = new_data["timestamp"]
 
     loop.close()
 

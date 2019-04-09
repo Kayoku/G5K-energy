@@ -26,6 +26,7 @@ import sys
 import datetime
 import gzip
 import numpy as np
+import pymongo
 from execo_g5k import get_host_attributes
 
 LOGGER = logging.getLogger()
@@ -65,6 +66,40 @@ def is_omegawatt_available(args):
     return False
 
 
+def create_data(timestamp, sensor, power):
+    """
+    Create the Dict with data
+    :param timestamp: Timestamp int
+    :param sensor: Sensor name
+    :param power: Power value
+    :return: Dict data
+    """
+    return {
+        "timestamp": timestamp,
+        "sensor": sensor,
+        "power": power
+    }
+
+
+def connect_mongodb(args):
+    """
+    Return the collection to write the output
+    :param args: Script arguments
+    :return: MongoDB collection
+    """
+    mongo_client = pymongo.MongoClient(args.mongodb_uri,
+                                       serverSelectionTimeoutMS=5)
+    collection = mongo_client[args.mongodb_db][args.mongodb_collection]
+
+    # Check if it work
+    try:
+        mongo_client.admin.command('ismaster')
+    except pymongo.errors.ServerSelectionTimeoutError:
+        LOGGER.error("MongoDB error.")
+        exit(-1)
+
+    return collection
+
 ##############################################################################
 # Parser
 ##############################################################################
@@ -78,9 +113,9 @@ def arg_parser_init():
         description="Start PowerAPI with the specified configuration.")
 
     # MongoDB output
-    #parser.add_argument("output_uri", help="MongoDB output uri")
-    #parser.add_argument("output_db", help="MongoDB output database")
-    #parser.add_argument("output_collection", help="MongoDB output collection")
+    parser.add_argument("mongodb_uri", help="MongoDB output uri")
+    parser.add_argument("mongodb_db", help="MongoDB output database")
+    parser.add_argument("mongodb_collection", help="MongoDB output collection")
 
     # Node informations
     parser.add_argument("city_name", help="City name where the cluster is")
@@ -147,20 +182,17 @@ def main():
         LOGGER.error("Omegawatt-sensor not available for the node " + args.node_name)
         sys.exit(-1)
 
-    res = {"timestamps": [x for x in range(int(args.timestamp_start), int(args.timestamp_stop)+1)],
-           "values": []}
+    output = connect_mongodb(args)
     data = parse_omegawatt(args)
 
-    for ts in res['timestamps']:
+    for ts in range(int(args.timestamp_start), int(args.timestamp_stop)):
         # If offset is outofrange or
         #    data timestamp is different from the current ts
         if ts not in data:
-            res['values'].append(-1)
             continue
 
-        res['values'].append(data[ts])
-
-    print(res)
+        new_row = create_data(ts, "omegawatt-sensor", data[ts])
+        output.insert_one(new_row)
 
 
 if __name__ == "__main__":

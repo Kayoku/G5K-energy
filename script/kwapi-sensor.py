@@ -22,6 +22,7 @@ import argparse
 import requests
 import logging
 import sys
+import pymongo
 
 LOGGER = logging.getLogger()
 LOGGER.addHandler(logging.StreamHandler())
@@ -69,6 +70,42 @@ def is_kwapi_available(args):
     return False
 
 
+def connect_mongodb(args):
+    """
+    Return the collection to write the output
+    :param args: Script arguments
+    :return: MongoDB collection
+    """
+    mongo_client = pymongo.MongoClient(args.mongodb_uri,
+                                       serverSelectionTimeoutMS=5)
+    collection = mongo_client[args.mongodb_db][args.mongodb_collection]
+
+    # Check if it work
+    try:
+        mongo_client.admin.command('ismaster')
+    except pymongo.errors.ServerSelectionTimeoutError:
+        LOGGER.error("MongoDB error.")
+        exit(-1)
+
+    return collection
+
+
+def create_data(timestamp, sensor, power):
+    """
+    Create the Dict with data
+    :param timestamp: Timestamp int
+    :param sensor: Sensor name
+    :param power: Power value
+    :return: Dict data
+    """
+    return {
+        "timestamp": timestamp,
+        "sensor": sensor,
+        "power": power
+    }
+
+
+
 ##############################################################################
 # Parser
 ##############################################################################
@@ -86,9 +123,9 @@ def arg_parser_init():
     parser.add_argument("g5k_pass", help="G5K password")
 
     # MongoDB output
-    #parser.add_argument("output_uri", help="MongoDB output uri")
-    #parser.add_argument("output_db", help="MongoDB output database")
-    #parser.add_argument("output_collection", help="MongoDB output collection")
+    parser.add_argument("mongodb_uri", help="MongoDB output uri")
+    parser.add_argument("mongodb_db", help="MongoDB output database")
+    parser.add_argument("mongodb_collection", help="MongoDB output collection")
 
     # Node informations
     parser.add_argument("city_name", help="City name where the cluster is")
@@ -117,6 +154,7 @@ def main():
         LOGGER.error("Kwapi-sensor not available for the node " + args.node_name)
         sys.exit(-1)
 
+    output = connect_mongodb(args)
     url = get_kwapi_value_url(args.city_name,
                               args.node_name,
                               args.timestamp_start,
@@ -126,24 +164,18 @@ def main():
                               args.g5k_pass),
                         verify=False).json()
 
-    res = {"timestamps": [x for x in range(int(args.timestamp_start), int(args.timestamp_stop)+1)],
-           "values": []}
-
     # If there is no data, -1 everywhere
-    if len(data['items']) == 0:
-        res['values'] = [-1 for _ in res['timestamps']]
-    else:
+    if len(data['items']) > 0:
         offset = 0
-        for ts in res['timestamps']:
+        for ts in range(int(args.timestamp_start), int(args.timestamp_stop)):
             # If offset is outofrange or
             #    data timestamp is different from the current ts
             if (offset >= len(data['items'][0]['timestamps']) or
-                ts != data['items'][0]['timestamps'][offset]):
-                res['values'].append(-1)
+                    ts != data['items'][0]['timestamps'][offset]):
                 continue
-            res['values'].append(data['items'][0]['values'][offset])
+            new_row = create_data(ts, "kwapi-sensor", data['items'][0]['values'][offset])
+            output.insert_one(new_row)
             offset += 1
-    print(res)
 
 
 if __name__ == "__main__":
