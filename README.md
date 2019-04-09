@@ -2,14 +2,15 @@
 
 ## Compatibilities
 
-| City | Node | Kind of PDU (from G5K doc) | Omegawatt | Kwapi | SNMP |
-| ---- | ---- | ---- | ---- | ---- | ---- |
-| Lille | chetemi | APC vendors, 1 node = 2 PDU | X | X | O |
-| Grenoble | dahu | Dedicated Wattmetre | O | X | X |
-| Nantes | ecotype | No PDU | X | X | X |
-| Lyon | nova | Dedicated Wattmetre | O | O | X |
-| Rennes | paravance| EATON & APC vendors | X | O | X |
-| Nancy | grisou | EATON & APC vendors | X | O | O |
+	| City     | Node     | Kind of PDU (from G5K doc)  | Omegawatt | Kwapi | SNMP | 
+	| -------- | -------- | --------------------------- | --------- | ----- | ---- | 
+	| Lille    | chetemi  | APC vendors, 1 node = 2 PDU | X         | X     | O    | 
+	| Grenoble | dahu     | Dedicated Wattmetre         | O         | X     | X    |
+	| Nantes   | ecotype  | No PDU                      | X         | X     | X    |
+	| Lyon     | nova     | Dedicated Wattmetre         | O         | O     | X    |
+	| Rennes   | paravance| EATON & APC vendors         | X         | O     | X    |
+	| Nancy    | grisou   | EATON & APC vendors         | X         | O     | O    |
+
 
 ## Omegawatt-sensor
 
