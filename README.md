@@ -3,7 +3,7 @@
 ## Compatibilities
 
 | City | Node | Kind of PDU (from G5K doc) | Omegawatt | Kwapi | SNMP |
-| --- | --- | --- | --- | --- | --- |
+| ---- | ---- | -------------------------- | --------- | ----- | ---- |
 | Lille | chetemi | APC vendors, 1 node = 2 PDU | X | X | X |
 | Grenoble | dahu | Dedicated Wattmetre | X | X | X |
 | Nantes | ecotype | No PDU | X | X | X |
