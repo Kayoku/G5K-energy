@@ -71,7 +71,7 @@ def get_pdu_ip_and_port(args):
             if pdu_info['uid'] == pdu_name:
                 port = pdu_info['port']
                 break
-        ip = socket.gethostbyname(pdu_name+".lille.grid5000.fr")
+        ip = socket.gethostbyname(pdu_name+"."+args.city_name+".grid5000.fr")
         pdus_infos.append((pdu_name, ip, port))
 
     return pdus_infos
@@ -155,10 +155,6 @@ def arg_parser_init():
     """
     parser = argparse.ArgumentParser(
         description="Start PowerAPI with the specified configuration.")
-
-    # G5K informations
-    parser.add_argument("g5k_login", help="G5K login")
-    parser.add_argument("g5k_pass", help="G5K password")
 
     # MongoDB output
     parser.add_argument("mongodb_uri", help="MongoDB output uri")
