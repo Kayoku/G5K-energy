@@ -19,7 +19,7 @@ Module SNMP-sensor
 """
 
 import argparse
-import requests
+import signal
 import time
 import logging
 import sys
@@ -186,6 +186,14 @@ def main():
     if not is_snmp_available(args):
         LOGGER.error("SNMP-sensor not available for the node " + args.node_name)
         sys.exit(-1)
+
+    # Signal handling
+    def term_handler(_, __):
+        LOGGER.warning("Ended by user.")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, term_handler)
+    signal.signal(signal.SIGINT, term_handler)
 
     # Get the MongoDB
     output = connect_mongodb(args)
